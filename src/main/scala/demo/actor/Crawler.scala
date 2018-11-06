@@ -15,6 +15,7 @@ import scala.util.Try
   */
 
 //Protocol -----------------------
+/*
 case class FetchURL(url: String)
 case class FetchedURL(url: String, content: String)
 
@@ -150,3 +151,4 @@ object Parser extends App {
 
   parser.tell(Parse("http://scala-lang.org", html), printer)
 }
+*/
