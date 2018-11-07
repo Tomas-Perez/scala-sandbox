@@ -1,0 +1,109 @@
+(1) Dada una lista con datos de ventas:
+
+     case class Sales(date: String, amounts: List[Double])
+
+     val all = List(
+      Sales("2015-05-05", List(1200, 233)),
+      Sales("2015-05-06", List(3400, 24, 43)),
+      ...
+     )
+
+     Implementar funciones para obtener:
+
+   a) La lista de días en que las ventas superaron una cantidad “x” de dinero.
+
+   b) Los días en los que se realizaron el doble de ventas que el día anterior.
+
+   c) Los N días consecutivos en donde se obtuvieron las mejores ventas. N debe ser un parámetro de la función.
+
+
+(2) Dado un árbol con la jerarquía de trabajadores de una empresa:
+
+      case class Employee(name: String,
+                          sinceYear: Int,
+                          dependents: List[Employee])
+
+      val president = Employee(“...”, dependents = List(...))
+
+    Implementar funciones para obtener:
+
+   a) Cantidad de empleados de la empresa
+   b) Lista de empleados que tienen gente a cargo
+   c) Jefes que hayan dejado pasar más de 3 años entre la contratación de 2 de sus empleados
+
+(3) Implementar una función que recibe como parámetro el nombre de un archivo y devuelve como resultado la cantidad de veces que aparece cada palabra (no es necesario ordenar el resultado por frecuencia). Ej de uso:
+
+   val freq: List[(String, Int)] = calcWordFreq(“/some/file.txt”)
+
+
+(4) Implementar un actor en Akka para mantener estadísticas de una cantidad variable de mediciones con nombre. Por ejemplo:
+
+     stats ! Measurement(“load.millis”, 53)
+     stats ! Measurement(“fetch.millis”, 89)
+
+     stats ! GetStats(“load.millis”)
+     // Responde con Stats(“load.millis”, min, max, total, count)
+
+     stats ! Reset(“load.millis”)
+
+
+Implementar un mensaje GetStats(name) que devuelva el valor mínimo, máximo, total y cantidad de mediciones para ese nombre.
+
+
+
+Punto 1
+_______________________________________________________________________
+
+def total(s: Sales) = s.amounts.sum
+
+// (a)
+def moreThan(all: List[Sales], n: Double) = all.filter(s => total(s) > n)
+
+// (b)
+def doubleThanPrev(all: List[Sales]) = all.zip(all.tail).filter { case (a, b) => total(b) > 2 * total(a) } map(_._2.date)
+
+// (c)
+def bestNDays(all: days: Int) = all.sliding(days).toList.maxBy { _.map(s => total(s)).sum } map (_.date)
+
+// otra opción del punto (c) para N = 3
+val best3Days(all: List[Sales]) = all.sliding(3).toList.maxBy { case List(s1, s2, s3) => total(s1) + total(s2) + total(s3) } map (_.date)
+
+
+Punto 2
+_______________________________________________________________________
+
+case class Employee(
+   name: String, sinceYear: Int, dependents: List[Employee] = Nil
+) {
+
+  def subTree: List[Employee] = this :: dependents.flatMap(_.subTree)
+
+  def count = subTree.length // (a)
+
+  def bosses = subTree.filter(_.dependents.nonEmpty) // (b)
+
+  private def dependentsByYear = dependents.sortBy(_.sinceYear)
+
+  private def dependentsDiff3Years =
+     (dependentsByYear zip dependentsByYear.tail) filter {
+         case (e1, e2) => e2.sinceYear - e1.sinceYear > 3
+     }
+
+  def lazyBosses = bosses.filter(_.dependentsDiff3Years.nonEmpty) // (c)
+}
+
+Punto 3
+_______________________________________________________________________
+
+val lines = Source.fromFile("/myfile").getLines()
+val words = lines.filter(_.trim.nonEmpty).flatMap(_.split("\\s+").toList)
+
+val lowerWords = words.map(_.toLowerCase).toList
+val wordCount: List[(String, Int)] = lowerWords.map(e => (e, 1))
+
+val wordCountTotals = wordCount.groupBy(t => t._1).map {
+case (word, counts) =>
+   (word, counts.size)
+}
+
+

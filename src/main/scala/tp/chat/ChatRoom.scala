@@ -54,7 +54,8 @@ class ChatRoom extends Actor {
 }
 
 class ChatUser(val name: String) extends Actor {
-  implicit val localDateOrdering: Ordering[LocalDateTime] = Ordering.by(- _.toEpochSecond(ZoneOffset.UTC))
+  val localDateOrdering: Ordering[LocalDateTime] = Ordering.by(_.toEpochSecond(ZoneOffset.UTC))
+  implicit val reverseOrdering: Ordering[LocalDateTime] = localDateOrdering.reverse
 
   override def receive: Receive = onMessage(List.empty)
 
