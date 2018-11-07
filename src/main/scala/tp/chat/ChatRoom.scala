@@ -23,9 +23,7 @@ case object GetMessages
 case class UserMessages(msgs: List[Message])
 
 class ChatRoom extends Actor {
-  private val members: Map[ActorRef, String] = Map()
-
-  override def receive: Receive = onMessage(members)
+  override def receive: Receive = onMessage(Map.empty)
 
   private def onMessage(members: Map[ActorRef, String]): Receive = {
 
@@ -51,35 +49,38 @@ class ChatRoom extends Actor {
           case (ref, _) => ref ! NewMessage(Message(name, content, time))
         }
       }
+
   }
 }
 
-class UserChatPrinter(val name: String) extends Actor {
-  implicit val localDateOrdering: Ordering[LocalDateTime] = Ordering.by(_.toEpochSecond(ZoneOffset.UTC))
-  private var messages: List[Message] = List.empty
+class ChatUser(val name: String) extends Actor {
+  implicit val localDateOrdering: Ordering[LocalDateTime] = Ordering.by(- _.toEpochSecond(ZoneOffset.UTC))
 
-  override def receive: Receive = {
+  override def receive: Receive = onMessage(List.empty)
+
+  private def onMessage(messages: List[Message]): Receive = {
     case SubscribeTo(room) => room ! Subscribe(name)
     case UnsubscribeFrom(room) => room ! Unsubscribe
     case SendTo(room, content) => room ! SendMessage(content, LocalDateTime.now())
-    case NewMessage(msg) => messages = msg :: messages
-    case GetMessages => sender() ! UserMessages(messages.sortBy(_.sent))
+    case NewMessage(msg) => context.become(onMessage(msg :: messages))
+    case GetMessages => sender() ! UserMessages(messages.sortBy( _.sent))
   }
 }
 
 class ChatPrinter extends Actor {
   override def receive: Receive = {
-    case AddedMember(member) => println(s"[Printer]: Welcome $member")
-    case RemovedMember(member) => println(s"[Printer]: Bye $member")
-    case NewMessage(msg) => println(s"[Printer]: (${msg.sent.toString}) ${msg.member} says '${msg.content}'")
+    case UserMessages(msgs) => msgs.foreach { msg =>
+      println(s"${msg.member}: ${msg.content} - ${msg.sent}")
+    }
   }
 }
 
 object ChatApp extends App {
   val system = ActorSystem("mySystem")
   val room = system.actorOf(Props[ChatRoom], "chatRoom")
-  val johnny = system.actorOf(Props(new UserChatPrinter("Johnny")), "johnny")
-  val papa = system.actorOf(Props(new UserChatPrinter("Papa")), "papa")
+  val johnny = system.actorOf(Props(new ChatUser("Johnny")), "johnny")
+  val papa = system.actorOf(Props(new ChatUser("Papa")), "papa")
+  val printer = system.actorOf(Props[ChatPrinter], "printer")
 
   johnny ! SubscribeTo(room)
   papa ! SubscribeTo(room)
@@ -88,4 +89,5 @@ object ChatApp extends App {
   papa ! SendTo(room, "telling lies?")
   johnny ! SendTo(room, "no papa")
   johnny ! UnsubscribeFrom(room)
+  johnny.tell(GetMessages, printer)
 }
